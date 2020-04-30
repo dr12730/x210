@@ -1,0 +1,90 @@
+**************This code is based on the code from internet,
+**************but I do not know where it is from. If it's yours
+**************and think I have damaged your interests, please
+**************let me know. 
+**************contact: Du, Changbin <changbin.du@gmail.com>
+
+我是朱有鹏老师，这个dnw驱动是我从网络上下载的，看上面的说明是Du, Changbin仁兄
+整理的，但是似乎他也是网络上得来的，真正的作者他也不知道。不管是谁，我们感谢
+这些高手们，给我们留下了这么好用的工具，帮助我们对抗无耻的微软数字签名。
+
+这个驱动我拿到之后修改了2处，记录一下，也给后续看到这个文件的人作为参考：
+1、dnw.c中165行usage中将dwn改为dnw，这个估计原来的作者是笔误（我觉得得叫键盘误）
+2、dnw.c中159行中将strtol改为strtoul，这个不知道原来作者是什么环境下测试的，反正我在ubuntu14.04中（gcc4.8.2）如果用strtol转出来的地址就是错的···改为strtoul后即可解决，我还加了一句打印信息来调试。
+3、secbulk.c中27行将VID 0x04e8, PID 0x1234的组合后面的注释改为X210，原来是FL6410。原来这个驱动应该是飞凌的人写的，他们在驱动中支持了飞凌的2410和6410这两款芯片。刚好我们用的S5PV210这个芯片的VID和PID和6410一样的，所以我们不用修改驱动去添加自己芯片的VID和PID支持了，我就只改了注释。
+
+最后再声讨一下不要脸的微软和吝啬鬼的三星，还是linux下最好！！！
+
+1. build and install
+=====================
+	$ make
+	$ sudo make install
+
+2. dnw tool usage 
+=====================
+Connect board to PC and open minicom. Boot board and enter U-Boot command line mode.
+Then run command "dnw <download address>" in U-Boot. U-Boot may print bellow message:
+	Insert a OTG cable into the connector!
+	OTG cable Connected!
+	Now, Waiting for DNW to transmit data
+
+Now, you can download your file to board by follow command on PC end:
+	$ sudo dnw <file_to_download>
+
+Note: If your board isn't FL Ok6410, please set right load-address via "a" option.
+      Above steps have only download file to board's RAM, so you need  flash
+      it to nand via U-Boot command "nand write".
+
+If above doesn't work, pls check if you can see bellow message in `dmesg`.
+	usb 1-1: new full speed USB device using uhci_hcd and address 2
+	usb 1-1: configuration #1 chosen from 1 choice
+	secbulk:secbulk probing...
+	secbulk:bulk out endpoint found!
+
+===============================================
+some U-Boot commands special for FL Ok6410
+   (1) download U-Boot
+	$dnw 50008000
+	$nand erase 0 100000
+	$nand write.uboot 50008000 0 100000
+	#dnw default load address is 0xc0000000
+	all in one:
+	$dnw 50008000 && nand erase 0 100000 && nand write.uboot 50008000 0 100000
+   (2) download kernel
+	$dnw 50008000
+	$nand erase 100000 500000
+	$nand write.e 50008000 100000 500000
+	all in one:
+	$dnw 50008000 && nand erase 100000 500000 && nand write.e 50008000 100000 500000
+   (3) download yaffs2 root file system
+	$dnw 50008000
+	$nand erase 600000 #erase mtdblock2 partition
+	$nand write.yaffs2 50008000 600000 8000000 #instead 8000000 of real image size
+	all in one:
+	$dnw 50008000 && nand erase 600000 && nand write.yaffs2 50008000 600000 8000000
+   (4) download ubifs/cramfs root file system
+	$dnw 50008000
+	$nand erase 600000 #erase mtdblock2 partition
+	$nand write.e 50008000 600000 8000000 #instead 8000000 of real image size
+	all in one:
+	$dnw 50008000 && nand erase 600000 && nand write.e 50008000 600000 8000000
+   (5) download jffs2 root file system
+	$dnw 50008000
+	$nand erase 600000 #erase mtdblock2 partition
+	$nand write.jffs2 50008000 600000 8000000 #instead 8000000 of real image size
+	all in one:
+	$dnw 50008000 && nand erase 600000 && nand write.jffs2 50008000 600000 8000000
+   (6) deal with bad blocks
+	$nand scrub
+   (7) set kernel arguments
+	$setenv bootargs "root=/dev/mtdblock2 rootfstype=yaffs2 console=ttySAC0,115200" 
+	$save
+	$reset
+   (8) boot from NFS
+	$setenv bootargs "root=/dev/nfs nfsroot=192.168.0.231:/FileSystem-Yaffs2 \
+	 ip=192.168.0.232:192.168.0.231:192.168.0.201:255.255.255.0:8.8.8.8:eth0:off \
+	 console=ttySAC0,115200"
+	$save
+	# "192.168.0.231" is your host ip; "192.168.0.232" is your board's ip;
+	# "192.168.0.201" is gateway; "255.255.255.0" is mask.
+
